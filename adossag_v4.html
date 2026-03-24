@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Adósság kalkulátor</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{
+  min-height:100vh;
+  background:#060606;
+  font-family:-apple-system,system-ui,'Segoe UI',sans-serif;
+  color:#fff;
+  overscroll-behavior:none;
+  -webkit-text-size-adjust:100%;
+  transition:background 0.7s ease;
+}
+.shell{
+  max-width:480px;margin:0 auto;
+  padding:1.5rem 1.25rem 3rem;
+  min-height:100vh;
+  transition:background 0.7s ease;
+}
+.pulse-ring{
+  position:fixed;inset:0;pointer-events:none;
+  border:4px solid transparent;
+  transition:border-color 0.4s,opacity 0.3s;
+  z-index:999;
+}
+
+.top-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem;}
+.zone-label{font-size:10px;letter-spacing:0.13em;text-transform:uppercase;color:#555;margin-bottom:0.35rem;}
+.big-num{font-size:58px;font-weight:700;line-height:1;margin-bottom:0.15rem;transition:color 0.5s;}
+.big-sub{font-size:13px;color:#555;margin-bottom:1.25rem;}
+
+.meter-track{height:10px;border-radius:5px;background:#1c1c1c;margin-bottom:0.4rem;overflow:hidden;}
+.meter-fill{height:100%;border-radius:5px;transition:width 0.3s ease,background 0.5s;}
+.meter-labels{display:flex;justify-content:space-between;font-size:10px;color:#444;margin-bottom:1.5rem;}
+
+.sliders{display:flex;flex-direction:column;gap:12px;margin-bottom:1.5rem;}
+.sl-row{
+  border-radius:14px;padding:14px 16px;
+  border:1px solid #222;
+  transition:background 0.6s ease,border-color 0.6s ease;
+}
+.sl-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;}
+.sl-name{font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#555;}
+.sl-right{display:flex;align-items:baseline;gap:4px;}
+.sl-val{font-size:22px;font-weight:700;transition:color 0.5s;}
+.sl-unit{font-size:12px;color:#555;}
+
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  width:100%;height:5px;border-radius:3px;
+  outline:none;cursor:pointer;
+  transition:background 0.5s;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:30px;height:30px;border-radius:50%;
+  cursor:pointer;
+  transition:background 0.5s;
+  box-shadow:0 2px 8px rgba(0,0,0,0.7);
+}
+input[type=range]::-moz-range-thumb{
+  width:30px;height:30px;border-radius:50%;border:none;
+  cursor:pointer;transition:background 0.5s;
+}
+
+.heart-row{display:flex;align-items:center;gap:12px;margin-bottom:1rem;padding:2px 4px;}
+.heart-svg{overflow:visible;flex-shrink:0;transition:fill 0.5s;}
+.bpm-label{font-size:13px;color:#555;}
+.bpm-val{font-size:20px;font-weight:700;margin-left:auto;transition:color 0.5s;}
+
+.status-row{
+  border-radius:12px;padding:14px 16px;
+  transition:background 0.6s ease,border-color 0.6s ease;
+  border:1px solid transparent;margin-bottom:1.25rem;
+}
+.status-title{font-size:15px;font-weight:700;margin-bottom:5px;transition:color 0.5s;}
+.status-desc{font-size:13px;line-height:1.5;color:#888;transition:color 0.4s;}
+
+.extra-info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.5rem;}
+.info-card{
+  border-radius:12px;padding:12px 14px;
+  border:1px solid #1e1e1e;
+  transition:background 0.6s ease,border-color 0.6s ease;
+}
+.info-label{font-size:10px;color:#444;letter-spacing:0.07em;text-transform:uppercase;margin-bottom:6px;}
+.info-val{font-size:17px;font-weight:700;transition:color 0.5s;}
+
+.gyro-btn{
+  font-size:11px;padding:6px 14px;border-radius:20px;
+  border:1px solid #2a3a2a;background:#0d150d;color:#4a8a4a;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:all 0.4s;white-space:nowrap;
+  -webkit-appearance:none;
+}
+.gyro-tip{
+  font-size:11px;color:#444;text-align:center;
+  margin-top:0.5rem;margin-bottom:0.25rem;
+  min-height:16px;transition:color 0.4s;
+  line-height:1.4;
+}
+</style>
+</head>
+<body id="body">
+<div class="pulse-ring" id="pring"></div>
+<div class="shell" id="shell">
+
+  <div class="top-row">
+    <div>
+      <div class="zone-label">adósság / jövedelem arány</div>
+      <div class="big-num" id="bigNum">—</div>
+      <div class="big-sub">havi törlesztő aránya</div>
+    </div>
+    <button class="gyro-btn" id="gyroBadge" onclick="requestGyro()">giroszkóp</button>
+  </div>
+
+  <div class="meter-track"><div class="meter-fill" id="mfill" style="width:0%"></div></div>
+  <div class="meter-labels">
+    <span>0%</span><span>36% biztonságos</span><span>50% kritikus</span><span>100%</span>
+  </div>
+
+  <div class="sliders">
+    <div class="sl-row" id="row-income">
+      <div class="sl-top">
+        <span class="sl-name">havi bevétel</span>
+        <div class="sl-right"><span class="sl-val" id="v-income">400 000</span><span class="sl-unit">Ft</span></div>
+      </div>
+      <input type="range" id="s-income" min="50000" max="3000000" step="10000" value="400000" oninput="render()">
+    </div>
+    <div class="sl-row" id="row-debt">
+      <div class="sl-top">
+        <span class="sl-name">havi törlesztő</span>
+        <div class="sl-right"><span class="sl-val" id="v-debt">80 000</span><span class="sl-unit">Ft</span></div>
+      </div>
+      <input type="range" id="s-debt" min="0" max="500000" step="5000" value="80000" oninput="render()">
+    </div>
+    <div class="sl-row" id="row-assets">
+      <div class="sl-top">
+        <span class="sl-name">megtakarítás</span>
+        <div class="sl-right"><span class="sl-val" id="v-assets">500 000</span><span class="sl-unit">Ft</span></div>
+      </div>
+      <input type="range" id="s-assets" min="0" max="10000000" step="25000" value="500000" oninput="render()">
+    </div>
+    <div class="sl-row" id="row-months">
+      <div class="sl-top">
+        <span class="sl-name">hátralévő hónapok</span>
+        <div class="sl-right"><span class="sl-val" id="v-months">36</span><span class="sl-unit">hó</span></div>
+      </div>
+      <input type="range" id="s-months" min="1" max="360" step="1" value="36" oninput="render()">
+    </div>
+  </div>
+
+  <div class="heart-row">
+    <svg class="heart-svg" id="heartSvg" viewBox="0 0 22 20" width="26" height="24" fill="#e24b4a" xmlns="http://www.w3.org/2000/svg">
+      <path d="M11 18.5S1 12 1 5.5A5.5 5.5 0 0 1 11 3.2 5.5 5.5 0 0 1 21 5.5C21 12 11 18.5 11 18.5Z"/>
+    </svg>
+    <span class="bpm-label">szívritmus</span>
+    <span class="bpm-val" id="bpmVal">— bpm</span>
+  </div>
+
+  <div class="status-row" id="statusRow">
+    <div class="status-title" id="statusTitle">—</div>
+    <div class="status-desc" id="statusDesc">—</div>
+  </div>
+
+  <div class="extra-info">
+    <div class="info-card" id="ic1"><div class="info-label">teljes adósság</div><div class="info-val" id="totalDebtVal">—</div></div>
+    <div class="info-card" id="ic2"><div class="info-label">fedezettség</div><div class="info-val" id="coverageVal">—</div></div>
+    <div class="info-card" id="ic3"><div class="info-label">szabad jövedelem</div><div class="info-val" id="freeVal">—</div></div>
+    <div class="info-card" id="ic4"><div class="info-label">adósságmentes</div><div class="info-val" id="saveVal">—</div></div>
+  </div>
+
+  <div class="gyro-tip" id="gyroTip"></div>
+
+</div>
+<script>
+var ZONES=[
+  {max:20, bg:'#061610', cardBg:'#0a1e14', border:'#1d9e75', fill:'#1d9e75', accent:'#9fe1cb', statusBg:'#0a2018', bpm:60,
+   title:'Kiváló pénzügyi egészség', desc:'Az adósságterhelés nagyon alacsony. Tőkéd szabadon dolgozhat érted.'},
+  {max:36, bg:'#131000', cardBg:'#1a1500', border:'#c47a10', fill:'#ef9f27', accent:'#fac775', statusBg:'#1a1500', bpm:82,
+   title:'Biztonságos zóna', desc:'Az ajánlott határ alatt vagy. Kis tartalékkal még kényelmes a helyzet.'},
+  {max:50, bg:'#1a0900', cardBg:'#1e0e00', border:'#d85a30', fill:'#d85a30', accent:'#f0997b', statusBg:'#1e0e00', bpm:118,
+   title:'Figyelmeztető zóna', desc:'Megközelíted a kritikus határt. Csökkentsd az adósságot mielőbb!'},
+  {max:100,bg:'#160303', cardBg:'#200505', border:'#c03030', fill:'#e24b4a', accent:'#f09595', statusBg:'#200505', bpm:160,
+   title:'Veszélyes terhelés', desc:'Kritikus szint! Az adósság súlyosan terheli a havi mozgásteredet.'}
+];
+
+function gz(r){for(var i=0;i<ZONES.length;i++)if(r*100<=ZONES[i].max)return ZONES[i];return ZONES[3];}
+
+var heartTmr=null, beating=false, lastZoneIdx=-1;
+
+function setThumbColor(color){
+  var s=document.getElementById('_ts');
+  if(!s){s=document.createElement('style');s.id='_ts';document.head.appendChild(s);}
+  s.textContent=
+    'input[type=range]::-webkit-slider-thumb{background:'+color+' !important;box-shadow:0 2px 8px rgba(0,0,0,0.7) !important;}'+
+    'input[type=range]::-moz-range-thumb{background:'+color+' !important;}';
+}
+
+function render(){
+  var inc=+document.getElementById('s-income').value;
+  var dbt=+document.getElementById('s-debt').value;
+  var ast=+document.getElementById('s-assets').value;
+  var mo =+document.getElementById('s-months').value;
+
+  var ratio=inc>0 ? Math.min(dbt/inc,1) : 0;
+  var pct=Math.round(ratio*100);
+  var z=gz(ratio);
+  var zi=ZONES.indexOf(z);
+
+  var totalDebt=dbt*mo;
+  var cov=totalDebt>0 ? ast/totalDebt : 99;
+  var free=inc-dbt;
+  var saveMo=free>0&&totalDebt>0 ? Math.ceil(totalDebt/free) : 0;
+
+  // body + shell background (both need to change for full-screen color)
+  document.getElementById('body').style.background=z.bg;
+  document.getElementById('shell').style.background=z.bg;
+  document.getElementById('pring').style.borderColor=z.border;
+
+  // big number
+  document.getElementById('bigNum').textContent=pct+'%';
+  document.getElementById('bigNum').style.color=z.accent;
+
+  // meter
+  document.getElementById('mfill').style.width=pct+'%';
+  document.getElementById('mfill').style.background=z.fill;
+
+  // status card
+  document.getElementById('statusTitle').textContent=z.title;
+  document.getElementById('statusTitle').style.color=z.accent;
+  document.getElementById('statusDesc').textContent=z.desc;
+  document.getElementById('statusRow').style.background=z.statusBg;
+  document.getElementById('statusRow').style.borderColor=z.border+'80';
+
+  // slider cards
+  var flds=['income','debt','assets','months'];
+  for(var i=0;i<flds.length;i++){
+    var f=flds[i];
+    var v=+document.getElementById('s-'+f).value;
+    document.getElementById('v-'+f).textContent=
+      f==='months' ? Math.round(v) : Math.round(v).toLocaleString('hu-HU');
+    document.getElementById('v-'+f).style.color=z.accent;
+    document.getElementById('row-'+f).style.background=z.cardBg;
+    document.getElementById('row-'+f).style.borderColor=z.border+'50';
+    document.getElementById('s-'+f).style.background=z.border+'35';
+  }
+  setThumbColor(z.accent);
+
+  // info cards
+  var icBg=z.cardBg;
+  for(var j=1;j<=4;j++){
+    document.getElementById('ic'+j).style.background=icBg;
+    document.getElementById('ic'+j).style.borderColor=z.border+'40';
+  }
+  document.getElementById('totalDebtVal').textContent=totalDebt>0 ? Math.round(totalDebt/1000)+' e Ft' : '—';
+  document.getElementById('totalDebtVal').style.color=z.accent;
+
+  var covColor=cov>=1 ? '#1d9e75' : cov>=0.5 ? '#ef9f27' : '#e24b4a';
+  document.getElementById('coverageVal').textContent=totalDebt>0 ? Math.min(Math.round(cov*100),999)+'%' : '—';
+  document.getElementById('coverageVal').style.color=covColor;
+
+  document.getElementById('freeVal').textContent=Math.round(free).toLocaleString('hu-HU')+' Ft';
+  document.getElementById('freeVal').style.color=free>=0 ? z.accent : '#e24b4a';
+
+  document.getElementById('saveVal').textContent=saveMo>0 ? saveMo+' hónap' : '—';
+  document.getElementById('saveVal').style.color=z.accent;
+
+  // vibrate on zone change
+  if(zi!==lastZoneIdx){
+    if(navigator.vibrate){
+      if(zi===0) navigator.vibrate([30]);
+      else if(zi===1) navigator.vibrate([40,30,40]);
+      else if(zi===2) navigator.vibrate([60,40,60,40,60]);
+      else navigator.vibrate([80,30,80,30,80,30,150]);
+    }
+    lastZoneIdx=zi;
+  }
+
+  updateHeart(z.bpm, ratio, z.accent);
+}
+
+function updateHeart(bpm, ratio, color){
+  if(heartTmr){clearInterval(heartTmr);heartTmr=null;}
+  document.getElementById('bpmVal').textContent=bpm+' bpm';
+  document.getElementById('bpmVal').style.color=color;
+  document.getElementById('heartSvg').style.fill=color;
+
+  var ivl=Math.round(60000/bpm);
+  var heart=document.getElementById('heartSvg');
+  var pring=document.getElementById('pring');
+
+  heartTmr=setInterval(function(){
+    if(beating) return;
+    beating=true;
+    var sc=1+(ratio>0.5 ? 0.6 : ratio>0.36 ? 0.32 : 0.15);
+    heart.style.transition='transform 0.07s ease-out';
+    heart.style.transform='scale('+sc+')';
+    heart.style.transformOrigin='center';
+
+    if(ratio>0.36){
+      pring.style.transition='opacity 0.06s';
+      pring.style.opacity='1';
+      setTimeout(function(){
+        pring.style.opacity='0.08';
+        pring.style.transition='opacity 0.5s';
+      },90);
+      setTimeout(function(){pring.style.opacity='1';},600);
+    }
+
+    if(ratio>0.5 && navigator.vibrate) navigator.vibrate(ratio>0.75 ? [12,6,12] : 8);
+
+    if(ratio>0.5){
+      setTimeout(function(){
+        heart.style.transition='transform 0.06s ease-out';
+        heart.style.transform='scale('+(sc*0.8)+')';
+        setTimeout(function(){
+          heart.style.transition='transform 0.06s ease-out';
+          heart.style.transform='scale('+sc+')';
+        },65);
+      },105);
+    }
+
+    setTimeout(function(){
+      heart.style.transform='scale(1)';
+      heart.style.transition='transform 0.28s ease-in';
+      beating=false;
+    }, ratio>0.5 ? 270 : 140);
+  }, ivl);
+}
+
+// Gyroscope
+var gyroOn=false, gyroBase={b:null,g:null}, gyroAcc={i:0,d:0,a:0};
+
+function requestGyro(){
+  if(gyroOn) return;
+  if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
+    DeviceOrientationEvent.requestPermission().then(function(p){
+      if(p==='granted') startGyro();
+    }).catch(function(){
+      document.getElementById('gyroTip').textContent='Giroszkóp engedély megtagadva.';
+    });
+  } else {
+    startGyro();
+  }
+}
+
+function startGyro(){
+  if(gyroOn) return;
+  gyroOn=true;
+  var b=document.getElementById('gyroBadge');
+  b.textContent='giroszkóp: aktív';
+  b.style.background='#0d2e1a';
+  b.style.color='#1d9e75';
+  b.style.borderColor='#1d9e7550';
+  document.getElementById('gyroTip').textContent='balra/jobbra → bevétel & törlesztő  ·  előre/hátra → megtakarítás';
+  document.getElementById('gyroTip').style.color='#555';
+
+  window.addEventListener('deviceorientation', function(e){
+    if(gyroBase.b===null){gyroBase.b=e.beta;gyroBase.g=e.gamma;return;}
+    var db=e.beta-gyroBase.b;
+    var dg=e.gamma-gyroBase.g;
+    var th=2.5;
+
+    if(Math.abs(dg)>th){
+      var dir=dg>0?1:-1, mg=Math.abs(dg)/16;
+      gyroAcc.i+=dir*mg;
+      gyroAcc.d-=dir*mg*0.5;
+      if(Math.abs(gyroAcc.i)>=1){
+        var sl=document.getElementById('s-income');
+        sl.value=Math.max(+sl.min,Math.min(+sl.max,+sl.value+Math.sign(gyroAcc.i)*+sl.step));
+        gyroAcc.i=0;
+      }
+      if(Math.abs(gyroAcc.d)>=1){
+        var sl2=document.getElementById('s-debt');
+        sl2.value=Math.max(+sl2.min,Math.min(+sl2.max,+sl2.value+Math.sign(gyroAcc.d)*+sl2.step));
+        gyroAcc.d=0;
+      }
+    }
+    if(Math.abs(db)>th){
+      var dir2=db>0?-1:1, mg2=Math.abs(db)/16;
+      gyroAcc.a+=dir2*mg2;
+      if(Math.abs(gyroAcc.a)>=1){
+        var sl3=document.getElementById('s-assets');
+        sl3.value=Math.max(+sl3.min,Math.min(+sl3.max,+sl3.value+Math.sign(gyroAcc.a)*+sl3.step));
+        gyroAcc.a=0;
+      }
+    }
+    render();
+  });
+}
+
+// Android: auto-start gyro (no permission needed)
+if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission!=='function'){
+  startGyro();
+}
+
+render();
+</script>
+</body>
+</html>
